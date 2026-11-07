@@ -1,0 +1,13 @@
+{
+  "name": "affcheck",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Система выявления аффилированности между лицами по открытым источникам (Казахстан) — MVP",
+  "type": "commonjs",
+  "engines": { "node": ">=18" },
+  "scripts": {
+    "start": "node webapp/server.js",
+    "cli": "node cli.js",
+    "test": "node tests/smoke.js"
+  }
+}

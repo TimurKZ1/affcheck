@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>AffCheck — проверка аффилированности (Казахстан)</title>
+<style>
+  :root {
+    --bg: #0f1420; --panel: #171e2e; --line: #273049;
+    --text: #e8ecf4; --muted: #8b96ad;
+    --accent: #5b8cff; --ok: #39c37e; --warn: #e0a63b; --bad: #e05b5b;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; font: 14px/1.5 -apple-system, "Segoe UI", Roboto, "Inter", Arial, sans-serif; background: var(--bg); color: var(--text); }
+  header { padding: 18px 24px; border-bottom: 1px solid var(--line); display: flex; align-items: baseline; gap: 12px; }
+  header h1 { font-size: 18px; margin: 0; font-weight: 600; letter-spacing: .2px; }
+  header .sub { color: var(--muted); font-size: 12px; }
+  main { display: grid; grid-template-columns: 340px 1fr; gap: 16px; padding: 16px 24px; }
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 14px 16px; }
+  .card h2 { font-size: 13px; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); margin: 0 0 10px; }
+  label { display: block; font-size: 12px; color: var(--muted); margin: 10px 0 4px; }
+  input, select { width: 100%; padding: 8px 10px; border-radius: 8px; border: 1px solid var(--line); background: #0d1220; color: var(--text); }
+  button { margin-top: 14px; width: 100%; padding: 10px; border-radius: 8px; border: 0; background: var(--accent); color: #fff; font-weight: 600; cursor: pointer; }
+  button:disabled { opacity: .6; cursor: default; }
+  .score { display: flex; align-items: center; gap: 14px; }
+  .badge { font-size: 22px; font-weight: 700; padding: 8px 14px; border-radius: 10px; }
+  .b-0 { background: #1b2436; color: var(--muted); }
+  .b-1 { background: #223b2e; color: var(--ok); }
+  .b-2 { background: #3a341b; color: var(--warn); }
+  .b-3 { background: #3a241b; color: #ff9d66; }
+  .b-4 { background: #3a1b1b; color: var(--bad); }
+  #graph { height: 420px; border: 1px solid var(--line); border-radius: 10px; background: #0d1220; }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  th { color: var(--muted); font-weight: 500; font-size: 12px; }
+  .src { font-family: ui-monospace, Consolas, monospace; font-size: 11px; color: var(--muted); }
+  .src a { color: var(--accent); text-decoration: none; }
+  .entity { font-size: 13px; }
+  .entity .name { font-weight: 600; }
+  .entity .meta { color: var(--muted); font-size: 12px; white-space: pre-line; }
+  .statuses { display: flex; flex-wrap: wrap; gap: 6px; }
+  .chip { padding: 3px 8px; border-radius: 999px; font-size: 11px; border: 1px solid var(--line); }
+  .chip.ok { color: var(--ok); border-color: #2c5c47; }
+  .chip.fail { color: var(--bad); border-color: #5c2c2c; }
+  .warnings { color: var(--warn); font-size: 12px; margin-top: 8px; }
+  .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  .hidden { display: none; }
+</style>
+</head>
+<body>
+<header>
+  <h1>AffCheck · Казахстан</h1>
+  <div class="sub">выявление аффилированности по открытым источникам · MVP</div>
+</header>
+<main>
+  <section>
+    <div class="card">
+      <h2>Проверка пары</h2>
+      <label for="a">Лицо A (БИН/ИИН, название или ФИО)</label>
+      <input id="a" placeholder='напр. 100140001111 или ТОО «Альфа Строй»' value='100140001111'>
+      <label for="b">Лицо B</label>
+      <input id="b" placeholder='напр. 110240002222' value='110240002222'>
+      <label for="mode">Источники</label>
+      <select id="mode">
+        <option value="demo" selected>Демо (без сети)</option>
+        <option value="all">Все (live + демо + импорт)</option>
+        <option value="live">Только живые источники</option>
+      </select>
+      <button id="run">Проверить</button>
+      <div id="warnings" class="warnings"></div>
+    </div>
+
+    <div class="card" style="margin-top:16px">
+      <h2>Источники</h2>
+      <div id="statuses" class="statuses"><span class="chip">—</span></div>
+    </div>
+
+    <div class="card" style="margin-top:16px">
+      <h2>Карточки лиц</h2>
+      <div id="entities" class="entity">Выполните проверку.</div>
+    </div>
+  </section>
+
+  <section>
+    <div class="card">
+      <h2>Скоринг</h2>
+      <div class="score">
+        <div id="scoreBadge" class="badge b-0">—</div>
+        <div id="verdict" style="font-size:15px">Ожидание запроса</div>
+      </div>
+    </div>
+
+    <div class="card" style="margin-top:16px">
+      <h2>Граф связей</h2>
+      <div id="graph"></div>
+    </div>
+
+    <div class="card" style="margin-top:16px">
+      <h2>Факторы и источники</h2>
+      <table id="factors">
+        <thead><tr><th style="width:60px">Балл</th><th>Фактор</th><th>Источники</th></tr></thead>
+        <tbody><tr><td colspan="3" class="src">нет данных</td></tr></tbody>
+      </table>
+    </div>
+  </section>
+</main>
+
+<script src="https://unpkg.com/vis-network@9.1.9/standalone/umd/vis-network.min.js"></script>
+<script>
+const $ = (id) => document.getElementById(id);
+let network = null;
+
+function badgeClass(score) {
+  if (score === 0) return 'b-0';
+  if (score < 20) return 'b-1';
+  if (score < 50) return 'b-2';
+  if (score < 75) return 'b-3';
+  return 'b-4';
+}
+
+function render(report) {
+  const { scoring, graph, entities, sourceStatuses, warnings } = report;
+
+  $('scoreBadge').textContent = scoring.score + '/100';
+  $('scoreBadge').className = 'badge ' + badgeClass(scoring.score);
+  $('verdict').textContent = scoring.verdict;
+
+  $('statuses').innerHTML = (sourceStatuses || []).map((s) =>
+    `<span class="chip ${s.ok ? 'ok' : 'fail'}" title="${s.error || ''}">${s.source}${s.ok ? ' · ' + s.count : ''}</span>`
+  ).join('') || '<span class="chip">—</span>';
+
+  $('warnings').innerHTML = (warnings || []).map((w) => `! ${w}`).join('<br>');
+
+  const entHtml = ['a', 'b'].map((k) => {
+    const e = entities[k];
+    if (!e) return '';
+    const kg = (e.extra && e.extra.kgd_flags) ? '\nКГД: ' + Object.entries(e.extra.kgd_flags).filter(([,v])=>v).map(([k])=>k).join(', ') : '';
+    return `<div class="entity" style="margin-bottom:10px">
+      <div class="name">${k.toUpperCase()}. ${e.name}</div>
+      <div class="meta">${e.type}${e.bin ? ' · БИН/ИИН ' + e.bin : ''}${e.oked ? ' · ОКЭД ' + e.oked : ''}${e.kato ? ' · КАТО ' + e.kato : ''}
+${e.address || ''}${e.reg_date ? '\nрег. ' + e.reg_date : ''}${e.status ? ' · ' + e.status : ''}${kg}</div>
+    </div>`;
+  }).join('');
+  $('entities').innerHTML = entHtml || 'нет данных';
+
+  const tbody = $('factors').querySelector('tbody');
+  if (scoring.factors.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="3" class="src">факторы не выявлены</td></tr>';
+  } else {
+    tbody.innerHTML = scoring.factors.map((f) => {
+      const src = (f.evidence || []).map((ev) =>
+        `<div class="src">${ev.source} · ${ev.collected_at}${ev.url ? ` · <a href="${ev.url}" target="_blank">ссылка</a>` : ''}${ev.note ? ' — ' + ev.note : ''}</div>`
+      ).join('');
+      return `<tr><td><b>+${f.value}</b></td><td>${f.label}</td><td>${src}</td></tr>`;
+    }).join('');
+  }
+
+  const nodes = new vis.DataSet(graph.nodes.map((n) => ({
+    id: n.id, label: n.label, group: n.group, title: n.title,
+  })));
+  const edges = new vis.DataSet(graph.edges.map((e) => ({
+    id: e.id, from: e.from, to: e.to, label: e.label, title: e.title, arrows: 'to',
+  })));
+  const data = { nodes, edges };
+  const options = {
+    nodes: { shape: 'dot', size: 14, font: { color: '#e8ecf4', size: 12 } },
+    edges: { font: { color: '#8b96ad', size: 10, align: 'top' }, color: '#3a4560', smooth: true },
+    groups: {
+      company: { color: '#5b8cff' },
+      person: { color: '#39c37e' },
+      address: { color: '#e0a63b' },
+      phone: { color: '#b06bd6' },
+      email: { color: '#b06bd6' },
+    },
+    physics: { stabilization: true },
+    interaction: { hover: true },
+  };
+  if (network) network.destroy();
+  network = new vis.Network($('graph'), data, options);
+}
+
+$('run').addEventListener('click', async () => {
+  const a = $('a').value.trim();
+  const b = $('b').value.trim();
+  const mode = $('mode').value;
+  if (!a || !b) { $('warnings').textContent = 'Заполните оба поля'; return; }
+  $('run').disabled = true;
+  $('run').textContent = 'Проверка…';
+  try {
+    const res = await fetch('/api/check', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ a, b, mode }),
+    });
+    const report = await res.json();
+    if (!report.ok && report.warnings) {
+      $('warnings').innerHTML = report.warnings.map((w) => `! ${w}`).join('<br>');
+      return;
+    }
+    render(report);
+  } catch (e) {
+    $('warnings').textContent = 'Ошибка: ' + e.message;
+  } finally {
+    $('run').disabled = false;
+    $('run').textContent = 'Проверить';
+  }
+});
+</script>
+</body>
+</html>
