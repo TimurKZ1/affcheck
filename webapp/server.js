@@ -10,7 +10,8 @@ const path = require('path');
 const { AffiliationEngine } = require('../src/engine');
 
 const PORT = process.env.PORT || 8080;
-const STATIC = path.join(__dirname, 'static');
+const staticArg = process.argv.indexOf('--static-dir');
+const STATIC = staticArg >= 0 ? path.resolve(process.argv[staticArg + 1]) : path.join(__dirname, 'static');
 
 const MIME = {
   '.html': 'text/html; charset=utf-8',
@@ -46,6 +47,10 @@ function readBody(req) {
 
 const server = http.createServer(async (req, res) => {
   const url = new URL(req.url, `http://${req.headers.host}`);
+  if (req.method === 'GET' && staticArg >= 0) {
+    serveStatic(res, url.pathname === '/' ? 'index.html' : decodeURIComponent(url.pathname).replace(/^\/+/, ''));
+    return;
+  }
   if (req.method === 'GET' && (url.pathname === '/' || url.pathname === '/index.html')) {
     serveStatic(res, 'index.html');
     return;
