@@ -8,6 +8,7 @@
   "scripts": {
     "start": "node webapp/server.js",
     "cli": "node cli.js",
-    "test": "node tests/smoke.js"
+    "test": "node tests/smoke.js",
+    "build:pages": "node tools/build-pages.js"
   }
 }

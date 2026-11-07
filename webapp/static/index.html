@@ -187,12 +187,13 @@ $('run').addEventListener('click', async () => {
   $('run').disabled = true;
   $('run').textContent = 'Проверка…';
   try {
-    const res = await fetch('/api/check', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ a, b, mode }),
-    });
-    const report = await res.json();
+    const report = window.affcheckDemo
+      ? await window.affcheckDemo.check(a, b)
+      : await (await fetch('/api/check', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ a, b, mode }),
+        })).json();
     if (!report.ok && report.warnings) {
       $('warnings').innerHTML = report.warnings.map((w) => `! ${w}`).join('<br>');
       return;
